@@ -54,9 +54,18 @@ def year_sorted_order(fyear, score, tie_key) -> np.ndarray:
     """Row indices sorted by fiscal year, then the ranking order within each year."""
     s = np.asarray(score, dtype=float)
     _check_not_constant(s)
-    return np.lexsort(
-        (np.asarray(tie_key, dtype=np.int64), _sort_key(s), np.asarray(fyear, dtype=np.int64))
-    )
+    t = np.asarray(tie_key, dtype=np.int64)
+    fy = np.asarray(fyear, dtype=np.int64)
+    # Same result as np.lexsort((t, key, fy)), done as staged sorts because it is faster.
+    o = np.argsort(t)
+    ts = t[o]
+    if (ts[1:] == ts[:-1]).any():
+        o = np.argsort(t, kind="stable")
+    o = o[np.argsort(_sort_key(s)[o], kind="stable")]
+    f = fy[o] - fy.min()
+    if f.max() < np.iinfo(np.int16).max:
+        f = f.astype(np.int16)
+    return o[np.argsort(f, kind="stable")]
 
 
 def flag_by_budget(fyear, score, tie_key, b: float) -> np.ndarray:
@@ -64,9 +73,9 @@ def flag_by_budget(fyear, score, tie_key, b: float) -> np.ndarray:
     fy = np.asarray(fyear, dtype=np.int64)
     order = year_sorted_order(fy, score, tie_key)
     fy_sorted = fy[order]
-    _, start, inv, counts = np.unique(
-        fy_sorted, return_index=True, return_inverse=True, return_counts=True
-    )
+    start = np.flatnonzero(np.r_[True, fy_sorted[1:] != fy_sorted[:-1]])
+    counts = np.diff(np.r_[start, fy.size])
+    inv = np.repeat(np.arange(start.size), counts)
     k = np.ceil(np.round(b * counts, 9)).astype(np.int64)
     pos_in_year = np.arange(fy.size) - start[inv]
     flags = np.zeros(fy.size, dtype=bool)

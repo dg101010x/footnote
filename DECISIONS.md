@@ -68,3 +68,16 @@ An independent subagent audit found three holes. All three are fixed.
 - If both parts of rule 2c are missing, the rule 2c score is 0, not missing, so the row sits at the bottom of its year.
 - The logistic standard deviation uses ddof=0. `scale_pos_weight` raises an error when the fit rows have no positives.
 - In candidate selection, "smaller model" means fewer leaves times trees, then fewer leaves.
+
+## Evaluation and bootstrap (built by a subagent, reviewed by the lead)
+
+- `flag_by_budget` sorts in stages (stable sort on score, then year). A test checks it gives the same result as a single lexsort.
+- The constant-score check runs on the whole score array, not year by year.
+- Bootstrap copies get tie key `tie_key * 1_000_003 + draw_position`. Copies of one row sit next to each other, so each method is ranked once per run. A test checks this fast path against replicates built explicitly.
+- In bootstrap replicates, the case unit is (case id, company, copy). A company drawn twice gives two units, and each of the 3 two-company cases counts as two units. The point estimate counts cases by case id on the real data, so those 3 count once there. The notebook states this.
+- Company draws use `rng.integers(0, n_companies, n_companies)` over the sorted unique gvkeys, with `numpy.default_rng(0)`.
+- A replicate is valid for a stat when its denominator is above zero. Gap stats need both seen and unseen positives.
+- Every difference stat gets a verdict. Recall stats and stats with no valid replicates get none.
+- `auc_metrics` sets missing scores to the minimum minus 1, so they rank last.
+- Size thirds rank total assets within each fiscal year (ties broken by tie key), then split into 3 equal bins.
+- Seen versus unseen companies is built by the caller from 1990 to 2001 rows in the label view and passed in as a mask.
