@@ -125,6 +125,10 @@ def check_schema(df: pd.DataFrame) -> None:
 def load_raw(path: Path | str = DEFAULT_PATH, allow_download: bool = True) -> pd.DataFrame:
     """Load the verified file, all years, with row_id and tie_key added.
 
+    Before the freeze, the 28 inputs and 14 ready-made ratios of fiscal years
+    2003 to 2014 are set to NaN after the schema checks, so only keys, labels
+    and counts survive for those rows. Reload after the freeze to get them.
+
     Do not use this directly for modelling. Use splits.load_split, which locks
     fiscal years 2003 to 2014 until artifacts/frozen.json exists.
 
@@ -135,10 +139,25 @@ def load_raw(path: Path | str = DEFAULT_PATH, allow_download: bool = True) -> pd
     path = ensure_file(path, allow_download=allow_download)
     df = pd.read_csv(path)
     check_schema(df)
+    schema_counts = {
+        "rows_at_le_0": int((df["at"] <= 0).sum()),
+        "rows_sale_le_0": int((df["sale"] <= 0).sum()),
+        "missing_by_column": {c: int(n) for c, n in df.isna().sum().items()},
+    }
     df["gvkey"] = df["gvkey"].astype("int64")
     df["fyear"] = df["fyear"].astype("int64")
     df["misstate"] = df["misstate"].astype("int64")
     df["row_id"] = np.arange(len(df), dtype=np.int64)
     rng = np.random.default_rng(TIE_SEED)
     df["tie_key"] = rng.permutation(len(df)).astype(np.int64)
+    # Rule 1: before the freeze, blank out every feature value of fiscal years
+    # 2003 to 2014 so nothing downstream can read them by plain slicing.
+    from .splits import LOCKED_FROM_YEAR, is_frozen
+
+    df.attrs["locked_values_masked"] = False
+    if not is_frozen():
+        locked = df["fyear"] >= LOCKED_FROM_YEAR
+        df.loc[locked, RAW_ITEMS + READY_RATIOS] = np.nan
+        df.attrs["locked_values_masked"] = True
+    df.attrs["schema_counts"] = schema_counts
     return df

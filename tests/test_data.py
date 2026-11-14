@@ -43,7 +43,10 @@ def test_real_file_schema(raw):
     assert raw["fyear"].min() == 1990 and raw["fyear"].max() == 2014
     assert raw["gvkey"].nunique() == 18_444
     assert not raw.duplicated(["gvkey", "fyear"]).any()
-    assert raw[data.RAW_ITEMS].notna().all().all()
+    # Checked on the unmasked file before 2003+ values are blanked out.
+    miss = raw.attrs["schema_counts"]["missing_by_column"]
+    assert all(miss[c] == 0 for c in data.RAW_ITEMS)
+    assert raw.loc[raw.fyear <= 2002, data.RAW_ITEMS].notna().all().all()
     # Empty p_aaer means no case: present exactly on positive rows.
     assert raw.loc[raw.misstate == 1, "p_aaer"].notna().all()
     assert raw.loc[raw.misstate == 0, "p_aaer"].isna().all()

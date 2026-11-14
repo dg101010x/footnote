@@ -8,6 +8,7 @@ exists, and assert_unlocked() is called by every function that reads features.
 """
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 
@@ -45,8 +46,19 @@ def frozen_path() -> Path:
     return Path(os.environ.get("FOOTNOTE_FROZEN_PATH", FROZEN_PATH))
 
 
+FROZEN_REQUIRED_KEYS = ("selected_candidate", "best_rule", "config", "commit")
+
+
 def is_frozen() -> bool:
-    return frozen_path().exists()
+    """True only if the freeze file exists, is valid JSON and has the required keys."""
+    p = frozen_path()
+    if not p.is_file():
+        return False
+    try:
+        rec = json.loads(p.read_text())
+    except (OSError, ValueError):
+        return False
+    return isinstance(rec, dict) and all(k in rec for k in FROZEN_REQUIRED_KEYS)
 
 
 def assert_unlocked(df_or_years) -> None:
@@ -159,8 +171,8 @@ def seen_companies(labels: pd.DataFrame) -> set:
 
 
 def gate_a_facts(df: pd.DataFrame) -> dict:
-    """The Gate A numbers. Uses labels for every year, and only total assets and
-    sales counts (a missing/schema-style count) over all rows."""
+    """The Gate A numbers. Uses labels for every year, plus the all-row counts of
+    total assets <= 0 and sales <= 0 that load_raw records before masking."""
     labels = label_view(df)
     cases = case_table(labels)
     grp = case_group(labels)
@@ -173,7 +185,7 @@ def gate_a_facts(df: pd.DataFrame) -> dict:
         "test_seen_positive_years": int(seen_test.sum()),
         "test_unseen_positive_years": int((test & (grp == "unseen")).sum()),
         "test_seen_cases": int(labels.loc[seen_test, CASE_ID].nunique()),
-        "rows_at_le_0": int((df["at"] <= 0).sum()),
-        "rows_sale_le_0": int((df["sale"] <= 0).sum()),
+        "rows_at_le_0": int(df.attrs["schema_counts"]["rows_at_le_0"]),
+        "rows_sale_le_0": int(df.attrs["schema_counts"]["rows_sale_le_0"]),
         "two_company_cases": int((cases["n_companies"] > 1).sum()),
     }

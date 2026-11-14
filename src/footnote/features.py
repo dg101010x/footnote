@@ -41,11 +41,14 @@ def _safe_div(num: pd.Series, den: pd.Series) -> pd.Series:
 
 
 def compute_features(raw: pd.DataFrame) -> pd.DataFrame:
-    """Compute the 61 features from the 28 raw items. Does not check the lock.
+    """Compute the 61 features from the 28 raw items.
 
     Works on any frame holding the 28 raw columns, including a single
-    user-entered row in the app. Row-wise only.
+    user-entered row in the app. Row-wise only. If the frame has an fyear
+    column, the test lock is checked.
     """
+    if "fyear" in raw:
+        assert_unlocked(raw)
     missing = [c for c in RAW_ITEMS if c not in raw]
     if missing:
         raise KeyError(f"Missing raw items {missing}")
@@ -68,7 +71,8 @@ def compute_features(raw: pd.DataFrame) -> pd.DataFrame:
 
 def build_features(df: pd.DataFrame) -> pd.DataFrame:
     """Features for rows of the company-year file. Refuses locked years before the freeze."""
-    assert_unlocked(df)
+    if "fyear" not in df:
+        raise KeyError("build_features needs the fyear column so the lock can be checked")
     return compute_features(df)
 
 

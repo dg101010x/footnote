@@ -81,6 +81,34 @@ def test_locked_years_refused():
     r["fyear"] = 2003
     with pytest.raises(LockedSplitError):
         F.build_features(r)
+    with pytest.raises(LockedSplitError):
+        F.compute_features(r)
+
+
+def test_build_features_needs_fyear():
+    with pytest.raises(KeyError):
+        F.build_features(_row())
+
+
+def test_independent_recompute_real(raw):
+    """Recompute a few features by hand from the real 1990-2001 file."""
+    from footnote.splits import load_split
+
+    ff = load_split("final_fit", raw)
+    X = F.build_features(ff)
+    def div(n, d):
+        return np.where(d > 0, n / np.where(d > 0, d, 1.0), np.nan)
+    checks = {
+        "rect_at": div(ff.rect, ff["at"]),
+        "current_ratio": div(ff.act, ff.lct),
+        "gross_margin": div(ff.sale - ff.cogs, ff.sale),
+        "book_to_market": div(ff.ceq, ff.prcc_f * ff.csho),
+        "soft_assets_share": div(ff["at"] - ff.ppegt - ff.che, ff["at"]),
+        "log_assets": np.log(1 + np.maximum(ff["at"], 0)),
+    }
+    for name, expected in checks.items():
+        np.testing.assert_allclose(X[name].to_numpy(), expected, rtol=1e-12, equal_nan=True,
+                                   err_msg=name)
 
 
 def test_real_features(raw):

@@ -29,3 +29,11 @@ Choices made during the build, simplest option first. Newest at the bottom of ea
 - Validation model selection drops positive validation rows whose case began before 2000 (70 rows).
 - A test company is "seen" if it has any row in 1990 to 2001 (from the label view only).
 - 3 cases span two companies (gvkey). Case-level bootstrap intervals that resample companies are slightly off for these.
+
+## Lock hardening after the Phase A audit
+
+An independent subagent audit found three holes. All three are fixed.
+
+- `load_raw()` now blanks out (NaN) the 28 inputs and the 14 ready-made ratios for fiscal years 2003 to 2014 whenever there is no valid freeze. The schema checks and the all-row counts (assets <= 0, sales <= 0, missing values per column) run before the blanking and are kept in `df.attrs["schema_counts"]`. After the freeze, reload to get the real values.
+- `compute_features()` checks the lock whenever the frame has an `fyear` column. A single row typed into the app has no `fyear`, so it is not blocked. `build_features()` requires `fyear`.
+- `is_frozen()` no longer trusts any file that exists. The file must be valid JSON with `selected_candidate`, `best_rule`, `config` and `commit`.

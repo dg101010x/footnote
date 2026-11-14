@@ -49,8 +49,18 @@ def test_assert_unlocked():
     splits.assert_unlocked(_toy().query("fyear <= 2002"))
 
 
+FAKE_FREEZE = {"selected_candidate": "G1", "best_rule": "2a", "config": {}, "commit": "x"}
+
+
+@pytest.mark.parametrize("content", ["", "not json", json.dumps({"frozen": True})])
+def test_invalid_freeze_file_does_not_unlock(_not_frozen, content):
+    _not_frozen.write_text(content)
+    with pytest.raises(LockedSplitError):
+        splits.load_split("test", _toy())
+
+
 def test_freeze_unlocks(_not_frozen):
-    _not_frozen.write_text(json.dumps({"frozen": True}))
+    _not_frozen.write_text(json.dumps(FAKE_FREEZE))
     assert len(splits.load_split("test", _toy())) == 1
     splits.assert_unlocked(_toy())
 
@@ -91,3 +101,14 @@ def test_real_locked(raw):
         splits.load_split("confirmation", raw)
     ff = splits.load_split("final_fit", raw)
     assert ff["fyear"].max() == 2001 and len(ff) == 58_634 + 13_114
+
+
+def test_load_raw_masks_locked_values(raw):
+    from footnote.data import RAW_ITEMS, READY_RATIOS
+
+    locked = raw["fyear"] >= 2003
+    assert raw.attrs["locked_values_masked"]
+    assert raw.loc[locked, RAW_ITEMS + READY_RATIOS].isna().all().all()
+    assert raw.loc[~locked, RAW_ITEMS].notna().all().all()
+    # Labels survive for counts.
+    assert raw.loc[locked, "misstate"].sum() == 261 + 112
