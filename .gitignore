@@ -1,0 +1,11 @@
+# Dataset is never committed (BUILD_SPEC rule 6)
+data/
+*.csv
+!artifacts/*.csv
+
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ipynb_checkpoints/
+artifacts/models/
