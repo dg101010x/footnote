@@ -37,3 +37,17 @@ An independent subagent audit found three holes. All three are fixed.
 - `load_raw()` now blanks out (NaN) the 28 inputs and the 14 ready-made ratios for fiscal years 2003 to 2014 whenever there is no valid freeze. The schema checks and the all-row counts (assets <= 0, sales <= 0, missing values per column) run before the blanking and are kept in `df.attrs["schema_counts"]`. After the freeze, reload to get the real values.
 - `compute_features()` checks the lock whenever the frame has an `fyear` column. A single row typed into the app has no `fyear`, so it is not blocked. `build_features()` requires `fyear`.
 - `is_frozen()` no longer trusts any file that exists. The file must be valid JSON with `selected_candidate`, `best_rule`, `config` and `commit`.
+
+## Phase B and later, process
+
+- On Saturday Dhairya wrote "GO ahead start phase B and all the other phases", then "just make sure you use sub agents to build". The lead takes this as approval to write `artifacts/frozen.json` once validation selection is finished, without stopping at Gate B. The validation table and the picks are still reported to him unchanged, and are saved in `artifacts/tuning_log.csv` and `artifacts/validation_table.csv` before any test scoring.
+- Modules are built by parallel subagents, each working on its own files. The lead (main session) reviews, runs the tests, commits, writes the freeze and runs the one test-window scoring.
+
+## Baselines and selection
+
+- Rule 2c: the within-year percentile rank (pct rank among non-missing values in that fiscal year) of 2a and of 2b, averaged. A missing component counts as percentile 0, so rows missing both rank at the bottom. Rules 2a and 2b keep NaN, and NaN ranks last in evaluation.
+- The best fair rule is chosen on the same validation evaluation rows as the model, meaning 2000 to 2001 with the 70 positive rows from cases that began before 2000 removed. Yearly budgets are computed on those remaining rows.
+- The logistic baseline scores with `decision_function` (it is a ranking). Order of preprocessing: clip to fit-row 1st/99th percentiles, then fill missing with the fit-row median, then standardize with the fit-row mean and standard deviation (a standard deviation of 0 becomes 1).
+- For model selection the logistic baseline is fit on 1990 to 1999 and shown on validation for information only. For the test run it is refit on 1990 to 2001, the same rows as the final model.
+- Final LightGBM boosters are saved as LightGBM text files in `artifacts/model/`, not pickles, so they load across versions and are safe to commit. The model is not the dataset.
+- Budget K_y = ceil(b * N_y), computed as ceil(round(b * N_y, 9)) so floating-point error cannot add a row.
