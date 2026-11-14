@@ -51,3 +51,12 @@ An independent subagent audit found three holes. All three are fixed.
 - For model selection the logistic baseline is fit on 1990 to 1999 and shown on validation for information only. For the test run it is refit on 1990 to 2001, the same rows as the final model.
 - Final LightGBM boosters are saved as LightGBM text files in `artifacts/model/`, not pickles, so they load across versions and are safe to commit. The model is not the dataset.
 - Budget K_y = ceil(b * N_y), computed as ceil(round(b * N_y, 9)) so floating-point error cannot add a row.
+
+## Guardrails (built by a subagent, reviewed by the lead)
+
+- The spec gives no wording for the current-liabilities, shares and price warnings. They read "Current liabilities are zero or less, so the current ratio could not be computed.", "Shares outstanding are zero or less, so book to market could not be computed." and "Price per share is zero or less, so book to market could not be computed."
+- The full-dollars check fires when the absolute value is above 1,000,000. Exactly 1,000,000 does not fire.
+- When total assets are zero or less, the balance check and the part-larger-than-whole check are skipped. The error already blocks the score.
+- When any field is missing or not a number, only that error and the cohort note are returned.
+- The balance check fires only when the gap is more than 25% of assets, not when it equals 25%.
+- `count_out_of_range` skips missing features and features that have no bounds.
