@@ -60,3 +60,11 @@ An independent subagent audit found three holes. All three are fixed.
 - When any field is missing or not a number, only that error and the cohort note are returned.
 - The balance check fires only when the gap is more than 25% of assets, not when it equals 25%.
 - `count_out_of_range` skips missing features and features that have no bounds.
+
+## Baselines and model (built by a subagent, reviewed by the lead)
+
+- `FinalModel` keeps each seed's LightGBM booster and always scores with `Booster.predict`, so a fitted model and a reloaded model run the same code. Tests check that save then load gives the same scores and contributions, and that contributions plus bias equal the score.
+- `model_meta.json` lists the seeds separately and records scale_pos_weight from the fit rows.
+- If both parts of rule 2c are missing, the rule 2c score is 0, not missing, so the row sits at the bottom of its year.
+- The logistic standard deviation uses ddof=0. `scale_pos_weight` raises an error when the fit rows have no positives.
+- In candidate selection, "smaller model" means fewer leaves times trees, then fewer leaves.
